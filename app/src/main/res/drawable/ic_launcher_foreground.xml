@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Premium Coin Ring Centered at (54,54) with Radius 26 (Safe zone 28 to 80) -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,28 C39.66,28 28,39.66 28,54 C28,68.34 39.66,80 54,80 C68.34,80 80,68.34 80,54 C80,39.66 68.34,28 54,28 Z M54,76 C41.87,76 32,66.13 32,54 C32,41.87 41.87,32 54,32 C66.13,32 76,41.87 76,54 C76,66.13 66.13,76 54,76 Z" />
+    
+    <!-- Dollar Currency Center Emblem -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,38 C54.88,38 55.6,38.72 55.6,39.6 L55.6,42.4 C58.24,42.8 60.4,44.16 60.4,46.8 L57.2,46.8 C57.2,45.76 56.0,44.8 54.0,44.8 C52.0,44.8 50.8,45.76 50.8,46.8 C50.8,48.0 52.0,48.64 54.4,49.2 C57.6,50.0 60.4,51.2 60.4,54.0 C60.4,56.4 58.24,58.0 55.6,58.4 L55.6,61.2 C55.6,62.08 54.88,62.8 54,62.8 C53.12,62.8 52.4,62.08 52.4,61.2 L52.4,58.4 C49.76,58.0 47.6,56.64 47.6,54.0 L50.8,54.0 C50.8,55.04 52.0,56.0 54.0,56.0 C56.0,56.0 57.2,55.04 57.2,54.0 C57.2,52.8 56.0,52.16 53.6,51.6 C50.4,50.8 47.6,49.6 47.6,46.8 C47.6,44.4 49.76,42.8 52.4,42.4 L52.4,39.6 C52.4,38.72 53.12,38 54,38 Z" />
+
+    <!-- Upward Trend Grid Overlay (Line inside Coin representing finance growth) -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M38,62 L44,56 L50,61 L64,47 L61.5,47 L61.5,44 L68,44 L68,50.5 L65,50.5 L65,48 L51,62 L45,57 L39,63 Z" />
+</vector>
