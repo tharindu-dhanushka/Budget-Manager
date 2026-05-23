@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme =
   darkColorScheme(
@@ -24,7 +25,20 @@ private val DarkColorScheme =
     outline = ElegantDarkBorder
   )
 
-private val LightColorScheme = DarkColorScheme // Force dark theme for the elegant dark vibe!
+private val LightColorScheme =
+  lightColorScheme(
+    primary = Color(0xFF6750A4),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFEADDFF),
+    onPrimaryContainer = Color(0xFF21005D),
+    secondary = Color(0xFF2E7D32),
+    secondaryContainer = Color(0xFFE8F5E9),
+    background = Color(0xFFFAF9FD),
+    surface = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF1C1D1F),
+    onSurface = Color(0xFF1C1D1F),
+    outline = Color(0xFF79747E)
+  )
 
 @Composable
 fun MyApplicationTheme(
@@ -39,7 +53,7 @@ fun MyApplicationTheme(
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
 
-      else -> DarkColorScheme
+      else -> if (darkTheme) DarkColorScheme else LightColorScheme
     }
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)

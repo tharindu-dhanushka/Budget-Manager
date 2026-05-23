@@ -36,11 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,18 +56,53 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 // Styling Color Tokens matching design guidelines
-private val SlateDark = Color(0xFF1C1B1F)
-private val SlateSurface = Color(0xFF2B2930)
-private val SlateBorder = Color(0xFF49454F)
-private val EmeraldAccent = Color(0xFFB5F2B8)
-private val EmeraldSurface = Color(0xFF113111)
-private val CoralAccent = Color(0xFFF2B8B5)
-private val CoralSurface = Color(0xFF311111)
-private val AmberAccent = Color(0xFFD0BCFF)
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 
-private val ElegantPurpleAccent = Color(0xFFD0BCFF)
-private val ElegantPurpleOnAccent = Color(0xFF381E72)
-private val ElegantPurpleDeep = Color(0xFF4F378B)
+object ThemeToggle {
+    var isDark by mutableStateOf(true)
+}
+
+val LocalCurrencySymbol = staticCompositionLocalOf { "$" }
+
+private val SlateDark: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF1C1B1F) else Color(0xFFFAF9FD)
+
+private val SlateSurface: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF2B2930) else Color(0xFFFFFFFF)
+
+private val SlateBorder: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF49454F) else Color(0xFFE5E2EB)
+
+private val EmeraldAccent: Color
+    get() = if (ThemeToggle.isDark) Color(0xFFB5F2B8) else Color(0xFF2E7D32)
+
+private val EmeraldSurface: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF113111) else Color(0xFFE8F5E9)
+
+private val CoralAccent: Color
+    get() = if (ThemeToggle.isDark) Color(0xFFF2B8B5) else Color(0xFFC62828)
+
+private val CoralSurface: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF311111) else Color(0xFFFFEBEE)
+
+private val AmberAccent: Color
+    get() = if (ThemeToggle.isDark) Color(0xFFD0BCFF) else Color(0xFF6750A4)
+
+private val ElegantPurpleAccent: Color
+    get() = if (ThemeToggle.isDark) Color(0xFFD0BCFF) else Color(0xFF6750A4)
+
+private val ElegantPurpleOnAccent: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF381E72) else Color(0xFFFFFFFF)
+
+private val ElegantPurpleDeep: Color
+    get() = if (ThemeToggle.isDark) Color(0xFF4F378B) else Color(0xFFEADDFF)
+
+private val TextPrimary: Color
+    get() = if (ThemeToggle.isDark) Color.White else Color(0xFF1C1B1F)
+
+private val TextSecondary: Color
+    get() = if (ThemeToggle.isDark) Color.LightGray else Color(0xFF5E5C64)
 
 enum class FinanceTab(val title: String, val icon: ImageVector) {
     OVERVIEW("Overview", Icons.Default.Dashboard),
@@ -78,6 +116,16 @@ enum class FinanceTab(val title: String, val icon: ImageVector) {
 @Composable
 fun FinanceAppScreen(viewModel: FinanceViewModel) {
     val context = LocalContext.current
+    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val selectedCurrency by viewModel.selectedCurrency.collectAsState()
+    val currentUserEmail by viewModel.currentUserEmail.collectAsState()
+    val savedGoogleEmails by viewModel.savedGoogleEmails.collectAsState()
+
+    LaunchedEffect(isDarkTheme) {
+        ThemeToggle.isDark = isDarkTheme
+    }
+
+    var showGoogleSignInDialog by remember { mutableStateOf(false) }
     var showProfileDrawer by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(FinanceTab.OVERVIEW) }
     val summary by viewModel.financialSummaryState.collectAsState()
@@ -87,6 +135,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
     val withdrawals by viewModel.atmWithdrawalsState.collectAsState()
     val savings by viewModel.savingsState.collectAsState()
     val loans by viewModel.loansState.collectAsState()
+    val loanInstallments by viewModel.loanInstallmentsState.collectAsState()
 
     // Dialog trigger states
     var showAddBank by remember { mutableStateOf(false) }
@@ -95,8 +144,10 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
     var showAddAtm by remember { mutableStateOf(false) }
     var showAddSaving by remember { mutableStateOf(false) }
     var showAddLoan by remember { mutableStateOf(false) }
+    var showCurrencyDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalCurrencySymbol provides selectedCurrency.symbol) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
         topBar = {
             TopAppBar(
@@ -111,14 +162,14 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         Text(
                             text = "Finance Overview",
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFE6E1E5),
+                            color = TextPrimary,
                             fontSize = 20.sp
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = SlateDark,
-                    titleContentColor = Color.White
+                    titleContentColor = TextPrimary
                 ),
                 actions = {
                     Row(
@@ -166,12 +217,21 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
                         icon = { Icon(tab.icon, contentDescription = tab.title) },
-                        label = { Text(tab.title, fontSize = 10.sp) },
+                        label = {
+                            Text(
+                                text = tab.title,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                letterSpacing = (-0.3).sp,
+                                overflow = TextOverflow.Clip
+                            )
+                        },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = ElegantPurpleAccent,
                             selectedTextColor = ElegantPurpleAccent,
-                            unselectedIconColor = Color.LightGray,
-                            unselectedTextColor = Color.LightGray,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary,
                             indicatorColor = ElegantPurpleDeep
                         ),
                         modifier = Modifier.testTag("nav_tab_${tab.name.lowercase()}")
@@ -205,6 +265,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         summary = summary,
                         onAddIncome = { showAddIncome = true },
                         onAddSaving = { showAddSaving = true },
+                        onAddBank = { showAddBank = true },
                         onDeleteIncome = { viewModel.deleteIncome(it) },
                         onDeleteSaving = { viewModel.deleteSaving(it) }
                     )
@@ -229,9 +290,15 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                 FinanceTab.LOANS -> {
                     LoansScreen(
                         loans = loans,
+                        loanInstallments = loanInstallments,
+                        banks = banks,
                         onAddLoan = { showAddLoan = true },
                         onSettledToggle = { viewModel.toggleLoanSettled(it) },
-                        onDeleteLoan = { viewModel.deleteLoan(it) }
+                        onDeleteLoan = { viewModel.deleteLoan(it) },
+                        onAddInstallment = { loanId, amt, bankId, dt, label ->
+                            viewModel.addLoanInstallment(loanId, amt, bankId, dt, label)
+                        },
+                        onDeleteInstallment = { viewModel.deleteLoanInstallment(it) }
                     )
                 }
             }
@@ -300,6 +367,73 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                     }
                 )
             }
+
+            if (showGoogleSignInDialog) {
+                GoogleSignInDialog(
+                    savedEmails = savedGoogleEmails,
+                    onDismiss = { showGoogleSignInDialog = false },
+                    onLogin = { email ->
+                        viewModel.loginWithEmail(email)
+                        showGoogleSignInDialog = false
+                    },
+                    onRemoveSavedEmail = { email ->
+                        viewModel.removeSavedEmail(email)
+                        if (currentUserEmail == email) {
+                            viewModel.logout()
+                        }
+                    }
+                )
+            }
+
+            if (showCurrencyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCurrencyDialog = false },
+                    title = { Text("Choose Default Currency", color = TextPrimary, fontWeight = FontWeight.Bold) },
+                    containerColor = SlateSurface,
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.example.ui.viewmodel.currencyOptions.forEach { curr ->
+                                val isSelected = selectedCurrency.code == curr.code
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) ElegantPurpleDeep.copy(alpha = 0.4f) else Color.Transparent)
+                                        .clickable {
+                                            viewModel.selectCurrency(curr)
+                                            showCurrencyDialog = false
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = curr.name,
+                                            color = TextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Active",
+                                            tint = ElegantPurpleAccent,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showCurrencyDialog = false }) {
+                            Text("Cancel", color = ElegantPurpleAccent)
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -353,7 +487,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         text = "My Profile",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     IconButton(
                         onClick = { showProfileDrawer = false }
@@ -361,12 +495,16 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close drawer",
-                            tint = Color.LightGray
+                            tint = TextSecondary
                         )
                     }
                 }
 
                 // Profile card details (JD logo design)
+                val initials = if (currentUserEmail != null) currentUserEmail!!.take(2).uppercase() else "JD"
+                val displayName = if (currentUserEmail != null) currentUserEmail!!.substringBefore("@") else "John Doe"
+                val displaySub = if (currentUserEmail != null) currentUserEmail!! else "Premium Member"
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = SlateSurface),
@@ -387,7 +525,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "JD",
+                                text = initials,
                                 color = ElegantPurpleAccent,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 24.sp
@@ -395,15 +533,17 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         }
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            text = "John Doe",
+                            text = displayName,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = TextPrimary,
                             fontSize = 16.sp
                         )
                         Text(
-                            text = "Premium Member",
+                            text = displaySub,
                             fontSize = 11.sp,
-                            color = ElegantPurpleAccent
+                            color = ElegantPurpleAccent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -415,46 +555,109 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         style = androidx.compose.ui.text.TextStyle(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.LightGray.copy(alpha = 0.5f),
+                            color = TextSecondary.copy(alpha = 0.5f),
                             letterSpacing = 1.sp
                         )
                     )
                     
-                    // Google Sign-In style button
-                    Button(
-                        onClick = {
-                            Toast.makeText(context, "Google Sign-In initialized", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                    if (currentUserEmail == null) {
+                        // Google Sign-In style button
+                        Button(
+                            onClick = {
+                                showGoogleSignInDialog = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .border(1.dp, SlateBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "Google Logo",
-                                tint = Color(0xFF4285F4),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = "Sign in with Google",
-                                color = Color(0xFF1F1F1F),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = "Google Logo",
+                                    tint = Color(0xFF4285F4),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = "Sign in with Google",
+                                    color = Color(0xFF1F1F1F),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    } else {
+                        // Signed in options: Logged in profile view & Sign Out / Change Options
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = SlateDark),
+                                modifier = Modifier.fillMaxWidth(),
+                                border = CardDefaults.outlinedCardBorder().copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(SlateBorder.copy(alpha = 0.3f))
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF34A853)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = "Connected Account",
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextButton(
+                                    onClick = { showGoogleSignInDialog = true }
+                                ) {
+                                    Text("Switch Account", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                TextButton(
+                                    onClick = {
+                                        viewModel.logout()
+                                        Toast.makeText(context, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                                    }
+                                ) {
+                                    Text("Sign Out", color = CoralAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
 
-                Divider(color = SlateBorder.copy(alpha = 0.4f))
+                HorizontalDivider(color = SlateBorder.copy(alpha = 0.4f))
 
                 // --- SETTINGS SECTION ---
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -463,53 +666,85 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         style = androidx.compose.ui.text.TextStyle(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.LightGray.copy(alpha = 0.5f),
+                            color = TextSecondary.copy(alpha = 0.5f),
                             letterSpacing = 1.sp
                         )
                     )
                     
-                    val settingsList = listOf(
-                        Triple(Icons.Default.Notifications, "Notifications", "Active"),
-                        Triple(Icons.Default.Language, "Language", "English"),
-                        Triple(Icons.Default.Lock, "Passcode lock", "Disabled")
-                    )
-                    
-                    settingsList.forEach { (icon, title, status) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    Toast.makeText(context, "$title setting", Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = title,
-                                    tint = Color.LightGray.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    text = title,
-                                    color = Color.White,
-                                    fontSize = 13.sp
-                                )
+                    // Theme Switch option row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                viewModel.setDarkTheme(!isDarkTheme)
                             }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                contentDescription = "Theme",
+                                tint = TextSecondary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
                             Text(
-                                text = status,
-                                color = ElegantPurpleAccent.copy(alpha = 0.7f),
-                                fontSize = 11.sp
+                                text = "Dark Theme",
+                                color = TextPrimary,
+                                fontSize = 13.sp
                             )
                         }
+                        Switch(
+                            checked = isDarkTheme,
+                            onCheckedChange = { viewModel.setDarkTheme(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = ElegantPurpleAccent,
+                                checkedTrackColor = ElegantPurpleDeep,
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color.LightGray
+                            )
+                        )
+                    }
+
+                    // Default Currency selector option row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                showCurrencyDialog = true
+                            }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Paid, 
+                                contentDescription = "Currency",
+                                tint = TextSecondary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "Default Currency",
+                                color = TextPrimary,
+                                fontSize = 13.sp
+                            )
+                        }
+                        Text(
+                            text = selectedCurrency.code,
+                            color = ElegantPurpleAccent.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
-                Divider(color = SlateBorder.copy(alpha = 0.4f))
+                HorizontalDivider(color = SlateBorder.copy(alpha = 0.4f))
 
                 // --- ABOUT US ---
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -518,7 +753,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         style = androidx.compose.ui.text.TextStyle(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.LightGray.copy(alpha = 0.5f),
+                            color = TextSecondary.copy(alpha = 0.5f),
                             letterSpacing = 1.sp
                         )
                     )
@@ -526,16 +761,16 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                         text = "T-Desk Solutions",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Text(
                         text = "All right received.",
                         fontSize = 11.sp,
-                        color = Color.LightGray.copy(alpha = 0.6f)
+                        color = TextSecondary.copy(alpha = 0.6f)
                     )
                 }
 
-                Divider(color = SlateBorder.copy(alpha = 0.4f))
+                HorizontalDivider(color = SlateBorder.copy(alpha = 0.4f))
 
                 // --- CONTACTS ---
                 var contactDetailsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -554,7 +789,7 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                             text = "Contact us:",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = TextPrimary
                         )
                         Icon(
                             imageVector = if (contactDetailsExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
@@ -615,12 +850,12 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                                         Text(
                                             text = "Send Email",
                                             fontSize = 10.sp,
-                                            color = Color.LightGray.copy(alpha = 0.6f)
+                                            color = TextSecondary.copy(alpha = 0.6f)
                                         )
                                         Text(
                                             text = "thdhanushka31@gmail.com",
                                             fontSize = 12.sp,
-                                            color = Color.White,
+                                            color = TextPrimary,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -666,12 +901,12 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                                         Text(
                                             text = "WhatsApp message",
                                             fontSize = 10.sp,
-                                            color = Color.LightGray.copy(alpha = 0.6f)
+                                            color = TextSecondary.copy(alpha = 0.6f)
                                         )
                                         Text(
                                             text = "+94 78 97 28 396",
                                             fontSize = 12.sp,
-                                            color = Color.White,
+                                            color = TextPrimary,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -682,7 +917,27 @@ fun FinanceAppScreen(viewModel: FinanceViewModel) {
                 }
             }
         }
+      }
     }
+}
+
+@Composable
+fun formatPrice(amount: Double): String {
+    val symbol = LocalCurrencySymbol.current
+    return String.format(Locale.getDefault(), "%s%.2f", symbol, amount)
+}
+
+@Composable
+fun formatPrice(amount: Float): String {
+    val symbol = LocalCurrencySymbol.current
+    return String.format(Locale.getDefault(), "%s%.2f", symbol, amount)
+}
+
+@Composable
+fun formatPriceSigned(amount: Double, positive: Boolean): String {
+    val symbol = LocalCurrencySymbol.current
+    val sign = if (positive) "+" else "-"
+    return String.format(Locale.getDefault(), "%s%s%.2f", sign, symbol, amount)
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -816,12 +1071,12 @@ fun InteractiveTrendChart(
                     Text(
                         text = "Savings & Costs Analytics",
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = TextPrimary,
                         fontSize = 15.sp
                     )
                     Text(
                         text = "Tap on nodes to view precise logs",
-                        color = Color.LightGray.copy(alpha = 0.6f),
+                        color = TextSecondary.copy(alpha = 0.6f),
                         fontSize = 11.sp
                     )
                 }
@@ -866,12 +1121,12 @@ fun InteractiveTrendChart(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(10.dp, 3.dp).background(EmeraldAccent, RoundedCornerShape(2.dp)))
                     Spacer(Modifier.width(6.dp))
-                    Text("Savings", color = Color.LightGray, fontSize = 11.sp)
+                    Text("Savings", color = TextSecondary, fontSize = 11.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(10.dp, 3.dp).background(CoralAccent, RoundedCornerShape(2.dp)))
                     Spacer(Modifier.width(6.dp))
-                    Text("Costs", color = Color.LightGray, fontSize = 11.sp)
+                    Text("Costs", color = TextSecondary, fontSize = 11.sp)
                 }
             }
             
@@ -891,34 +1146,42 @@ fun InteractiveTrendChart(
                         Icon(
                             imageVector = Icons.Default.ShowChart,
                             contentDescription = null,
-                            tint = Color.LightGray.copy(alpha = 0.3f),
+                            tint = TextSecondary.copy(alpha = 0.3f),
                             modifier = Modifier.size(36.dp)
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "No matching financial logs for this interval",
-                            color = Color.LightGray.copy(alpha = 0.5f),
+                            color = TextSecondary.copy(alpha = 0.5f),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center
                         )
                     }
                 } else {
+                    val currencySymbol = LocalCurrencySymbol.current
                     val paddingLeft = 45.dp
                     val paddingRight = 10.dp
                     val paddingTop = 15.dp
                     val paddingBottom = 25.dp
                     
-                    val textPaintY = remember {
+                    val textColorVal = run {
+                        val a = (TextSecondary.alpha * 255f).toInt()
+                        val r = (TextSecondary.red * 255f).toInt()
+                        val g = (TextSecondary.green * 255f).toInt()
+                        val b = (TextSecondary.blue * 255f).toInt()
+                        (a shl 24) or (r shl 16) or (g shl 8) or b
+                    }
+                    val textPaintY = remember(textColorVal) {
                         android.graphics.Paint().apply {
-                            color = android.graphics.Color.parseColor("#938F99")
+                            color = textColorVal
                             textSize = 26f
                             textAlign = android.graphics.Paint.Align.RIGHT
                             isAntiAlias = true
                         }
                     }
-                    val textPaintX = remember {
+                    val textPaintX = remember(textColorVal) {
                         android.graphics.Paint().apply {
-                            color = android.graphics.Color.parseColor("#938F99")
+                            color = textColorVal
                             textSize = 24f
                             textAlign = android.graphics.Paint.Align.CENTER
                             isAntiAlias = true
@@ -938,7 +1201,7 @@ fun InteractiveTrendChart(
                                     val pLeftPx = paddingLeft.toPx()
                                     val pRightPx = paddingRight.toPx()
                                     val workableWidth = widthPx - pLeftPx - pRightPx
-                                    val stepX = workableWidth / (points.size - 1)
+                                    val stepX = if (points.size > 1) workableWidth / (points.size - 1) else workableWidth
                                     
                                     val relativeX = offset.x - pLeftPx
                                     val index = (relativeX / stepX).roundToInt()
@@ -976,14 +1239,14 @@ fun InteractiveTrendChart(
                             )
                             
                             drawContext.canvas.nativeCanvas.drawText(
-                                String.format(Locale.US, "$%.0f", gridVal),
+                                String.format(Locale.US, "%s%.0f", currencySymbol, gridVal),
                                 pLeft - 10f,
                                 gridY + 8f,
                                 textPaintY
                             )
                         }
                         
-                        val stepX = chartW / (points.size - 1)
+                        val stepX = if (points.size > 1) chartW / (points.size - 1) else chartW
                         val savingsPath = Path()
                         val costsPath = Path()
                         
@@ -1133,24 +1396,24 @@ fun InteractiveTrendChart(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = "Period Label", color = Color.LightGray, fontSize = 9.sp)
-                        Text(text = point.label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Period Label", color = TextSecondary, fontSize = 9.sp)
+                        Text(text = point.label, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(EmeraldAccent))
                             Spacer(Modifier.width(4.dp))
-                            Text(text = "Savings Added", color = Color.LightGray, fontSize = 9.sp)
+                            Text(text = "Savings Added", color = TextSecondary, fontSize = 9.sp)
                         }
-                        Text(text = String.format(Locale.getDefault(), "$%.2f", point.savings), color = EmeraldAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = formatPrice(point.savings), color = EmeraldAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(CoralAccent))
                             Spacer(Modifier.width(4.dp))
-                            Text(text = "Costs Logged", color = Color.LightGray, fontSize = 9.sp)
+                            Text(text = "Costs Logged", color = TextSecondary, fontSize = 9.sp)
                         }
-                        Text(text = String.format(Locale.getDefault(), "$%.2f", point.costs), color = CoralAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = formatPrice(point.costs), color = CoralAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1254,66 +1517,73 @@ fun OverviewScreen(
             }
         } else {
             item {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .heightIn(max = 240.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(banks) { bank ->
-                        val balance = summary.bankBalances[bank.id] ?: bank.initialBalance
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = SlateSurface),
-                            border = CardDefaults.outlinedCardBorder().copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(SlateBorder)
-                            )
+                    banks.chunked(2).forEach { rowBanks ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                IconButton(
-                                    onClick = { onDeleteBank(bank) },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .size(24.dp)
-                                        .offset(x = (-4).dp, y = 4.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        tint = CoralAccent,
-                                        modifier = Modifier.size(14.dp)
+                            rowBanks.forEach { bank ->
+                                val balance = summary.bankBalances[bank.id] ?: bank.initialBalance
+                                Card(
+                                    modifier = Modifier.weight(1f),
+                                    colors = CardDefaults.cardColors(containerColor = SlateSurface),
+                                    border = CardDefaults.outlinedCardBorder().copy(
+                                        brush = androidx.compose.ui.graphics.SolidColor(SlateBorder)
                                     )
-                                }
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        IconButton(
+                                            onClick = { onDeleteBank(bank) },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .size(24.dp)
+                                                .offset(x = (-4).dp, y = 4.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete",
+                                                tint = CoralAccent,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
 
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.AccountBalanceWallet,
-                                        contentDescription = null,
-                                        tint = EmeraldAccent,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        text = bank.name,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        text = String.format(Locale.getDefault(), "$%.2f", balance),
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 16.sp,
-                                        color = EmeraldAccent
-                                    )
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.AccountBalanceWallet,
+                                                contentDescription = null,
+                                                tint = EmeraldAccent,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                text = bank.name,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontSize = 14.sp
+                                            )
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                text = formatPrice(balance),
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 16.sp,
+                                                color = EmeraldAccent
+                                            )
+                                        }
+                                    }
                                 }
+                            }
+                            if (rowBanks.size < 2) {
+                                Box(modifier = Modifier.weight(1f))
                             }
                         }
                     }
@@ -1392,7 +1662,7 @@ fun OverviewScreen(
                             }
                         }
                         Text(
-                            text = String.format(Locale.getDefault(), "-$%.2f", total),
+                            text = formatPriceSigned(total.toDouble(), false),
                             fontWeight = FontWeight.Black,
                             fontSize = 18.sp,
                             color = CoralAccent
@@ -1422,14 +1692,14 @@ fun FinancialSummaryCard(summary: FinancialSummary) {
                 letterSpacing = 1.sp
             )
             Text(
-                text = String.format(Locale.getDefault(), "$%.2f", summary.cashInHand),
+                text = formatPrice(summary.cashInHand),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 color = ElegantPurpleOnAccent
             )
 
             Spacer(Modifier.height(16.dp))
-            Divider(color = ElegantPurpleOnAccent.copy(alpha = 0.2f))
+            HorizontalDivider(color = ElegantPurpleOnAccent.copy(alpha = 0.2f))
             Spacer(Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -1445,7 +1715,7 @@ fun FinancialSummaryCard(summary: FinancialSummary) {
                         Text("Monthly Incomes", color = ElegantPurpleOnAccent.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     }
                     Text(
-                        text = String.format(Locale.getDefault(), "$%.2f", summary.totalIncomeThisMonth),
+                        text = formatPrice(summary.totalIncomeThisMonth),
                         color = ElegantPurpleOnAccent,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
@@ -1464,7 +1734,7 @@ fun FinancialSummaryCard(summary: FinancialSummary) {
                         Text("Monthly Costs", color = ElegantPurpleOnAccent.copy(alpha = 0.8f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     }
                     Text(
-                        text = String.format(Locale.getDefault(), "$%.2f", summary.totalCostThisMonth),
+                        text = formatPrice(summary.totalCostThisMonth),
                         color = ElegantPurpleOnAccent,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
@@ -1485,7 +1755,7 @@ fun FinancialSummaryCard(summary: FinancialSummary) {
             ) {
                 Text("Total Combined Savings in Banks", color = ElegantPurpleOnAccent.copy(alpha = 0.9f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    text = String.format(Locale.getDefault(), "$%.2f", summary.totalBankSavings),
+                    text = formatPrice(summary.totalBankSavings),
                     color = ElegantPurpleOnAccent,
                     fontWeight = FontWeight.Black,
                     fontSize = 13.sp
@@ -1506,6 +1776,7 @@ fun IncomeScreen(
     summary: FinancialSummary,
     onAddIncome: () -> Unit,
     onAddSaving: () -> Unit,
+    onAddBank: () -> Unit,
     onDeleteIncome: (Income) -> Unit,
     onDeleteSaving: (Saving) -> Unit
 ) {
@@ -1525,15 +1796,15 @@ fun IncomeScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = if (filterBySavingsTab) "SAVINGS DEPOSIT TOTAL" else "TOTAL ACCUMULATED INCOMES",
-                    color = Color.LightGray,
+                    color = TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = if (filterBySavingsTab) {
-                        String.format(Locale.getDefault(), "$%.2f", savings.sumOf { it.amount })
+                        formatPrice(savings.sumOf { it.amount })
                     } else {
-                        String.format(Locale.getDefault(), "$%.2f", incomes.sumOf { it.amount })
+                        formatPrice(incomes.sumOf { it.amount })
                     },
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
@@ -1572,26 +1843,58 @@ fun IncomeScreen(
         ) {
             Text(
                 text = if (!filterBySavingsTab) "Active Income Records" else "Manual Savings Entries",
-                color = Color.White,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                fontSize = 14.sp,
+                modifier = Modifier.weight(1f)
             )
 
-            Button(
-                onClick = { if (filterBySavingsTab) onAddSaving() else onAddIncome() },
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                modifier = Modifier.testTag(if (filterBySavingsTab) "add_saving_btn" else "add_income_btn")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    if (filterBySavingsTab) "Add Saving" else "Add Income",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
+                OutlinedButton(
+                    onClick = onAddBank,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EmeraldAccent),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .height(32.dp)
+                        .testTag("add_bank_from_income_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalanceWallet,
+                        contentDescription = "Add Bank Wallet",
+                        tint = EmeraldAccent,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Add Wallet",
+                        color = EmeraldAccent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { if (filterBySavingsTab) onAddSaving() else onAddIncome() },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .height(32.dp)
+                        .testTag(if (filterBySavingsTab) "add_saving_btn" else "add_income_btn")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = if (filterBySavingsTab) "Add Saving" else "Add Income",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
 
@@ -1605,7 +1908,7 @@ fun IncomeScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No incomes registered yet. Tap 'Add Income'.", color = Color.LightGray)
+                    Text("No incomes registered yet. Tap 'Add Income'.", color = TextSecondary)
                 }
             } else {
                 LazyColumn(
@@ -1629,7 +1932,7 @@ fun IncomeScreen(
                                     Text(
                                         text = income.description,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1643,20 +1946,20 @@ fun IncomeScreen(
                                         Text(
                                             text = "Wallet: $bankName",
                                             fontSize = 11.sp,
-                                            color = Color.LightGray
+                                            color = TextSecondary
                                         )
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             text = "• ${formatDate(income.date)}",
                                             fontSize = 11.sp,
-                                            color = Color.LightGray
+                                            color = TextSecondary
                                         )
                                     }
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = String.format(Locale.getDefault(), "+$%.2f", income.amount),
+                                        text = formatPriceSigned(income.amount, true),
                                         fontWeight = FontWeight.Black,
                                         color = EmeraldAccent,
                                         fontSize = 16.sp
@@ -1671,20 +1974,144 @@ fun IncomeScreen(
                 }
             }
         } else {
-            if (savings.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No manual savings recorded yet.", color = Color.LightGray)
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 1. Wallets Section Title
+                item {
+                    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+                        Text(
+                            text = "Registered Wallets / Bank Accounts",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+
+                if (banks.isEmpty()) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SlateSurface.copy(alpha = 0.5f)),
+                            border = CardDefaults.outlinedCardBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No wallets/bank accounts created yet. Use 'Add Wallet' above.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(banks) { bank ->
+                        val currBalance = summary.bankBalances[bank.id] ?: bank.initialBalance
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SlateDark),
+                            border = CardDefaults.outlinedCardBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = EmeraldAccent,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = bank.name,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = "Initial Deposit: ${formatPrice(bank.initialBalance)}",
+                                            color = TextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "Current Balance",
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = formatPrice(currBalance),
+                                        color = if (currBalance >= 0) EmeraldAccent else CoralAccent,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Separator Spacer
+                item {
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // 2. Manual Savings Section Title
+                item {
+                    Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                        Text(
+                            text = "Manual Savings Deposits Logs",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                if (savings.isEmpty()) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SlateSurface.copy(alpha = 0.5f)),
+                            border = CardDefaults.outlinedCardBorder(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No manual savings records found.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
                     items(savings) { saving ->
                         val bankName = banks.find { it.id == saving.bankId }?.name ?: "Unknown Bank"
                         Card(
@@ -1694,7 +2121,7 @@ fun IncomeScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1702,7 +2129,7 @@ fun IncomeScreen(
                                     Text(
                                         text = saving.description,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1716,26 +2143,26 @@ fun IncomeScreen(
                                         Text(
                                             text = "Bank: $bankName",
                                             fontSize = 11.sp,
-                                            color = Color.LightGray
+                                            color = TextSecondary
                                         )
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             text = "• ${formatDate(saving.date)}",
                                             fontSize = 11.sp,
-                                            color = Color.LightGray
+                                            color = TextSecondary
                                         )
                                     }
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = String.format(Locale.getDefault(), "+$%.2f", saving.amount),
+                                        text = formatPriceSigned(saving.amount, true),
                                         fontWeight = FontWeight.Black,
                                         color = EmeraldAccent,
-                                        fontSize = 16.sp
+                                        fontSize = 15.sp
                                     )
                                     IconButton(onClick = { onDeleteSaving(saving) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = CoralAccent)
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = CoralAccent, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -1785,12 +2212,12 @@ fun CostsScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "TOTAL MONTHLY COSTS OUTFLOW",
-                    color = Color.LightGray,
+                    color = TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = String.format(Locale.getDefault(), "$%.2f", displayedCosts.sumOf { it.amount }),
+                    text = formatPrice(displayedCosts.sumOf { it.amount }),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
                     color = CoralAccent
@@ -1819,7 +2246,7 @@ fun CostsScreen(
                 ) {
                     Text(
                         text = cat,
-                        color = if (isSelected) Color.Black else Color.White,
+                        color = if (isSelected) Color.White else TextPrimary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1836,7 +2263,7 @@ fun CostsScreen(
         ) {
             Text(
                 text = "Registered Expenses Log",
-                color = Color.White,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )
@@ -1863,7 +2290,7 @@ fun CostsScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No expenditures recorded in this group.", color = Color.LightGray)
+                Text("No expenditures recorded in this group.", color = TextSecondary)
             }
         } else {
             LazyColumn(
@@ -1911,34 +2338,34 @@ fun CostsScreen(
                                 Text(
                                     text = cost.description,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = TextPrimary
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.Payment,
                                         contentDescription = null,
-                                        tint = Color.LightGray,
+                                        tint = TextSecondary,
                                         modifier = Modifier.size(12.dp)
                                     )
                                     Spacer(Modifier.width(4.dp))
                                     Text(
                                         text = "Paid from: $bankName",
                                         fontSize = 11.sp,
-                                        color = Color.LightGray
+                                        color = TextSecondary
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = "• ${formatDate(cost.date)}",
                                         fontSize = 11.sp,
-                                        color = Color.LightGray
+                                        color = TextSecondary
                                     )
                                 }
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = String.format(Locale.getDefault(), "-$%.2f", cost.amount),
+                                    text = formatPriceSigned(cost.amount, false),
                                     fontWeight = FontWeight.Black,
                                     color = CoralAccent,
                                     fontSize = 16.sp
@@ -1981,22 +2408,22 @@ fun AtmScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "ATM WITHDRAWALS COUNTER",
-                        color = Color.LightGray,
+                        color = TextSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = String.format(Locale.getDefault(), "$%.2f", withdrawals.sumOf { it.amount }),
+                    text = formatPrice(withdrawals.sumOf { it.amount }),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = TextPrimary
                 )
                 Text(
                     text = "ATM withdrawals subtract from the bank's savings and insert cash into your hand.",
                     fontSize = 11.sp,
-                    color = Color.LightGray.copy(alpha = 0.8f)
+                    color = TextSecondary.copy(alpha = 0.8f)
                 )
             }
         }
@@ -2010,7 +2437,7 @@ fun AtmScreen(
         ) {
             Text(
                 text = "Atm Transaction history",
-                color = Color.White,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )
@@ -2037,7 +2464,7 @@ fun AtmScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No ATM operations logged.", color = Color.LightGray)
+                Text("No ATM operations logged.", color = TextSecondary)
             }
         } else {
             LazyColumn(
@@ -2061,21 +2488,21 @@ fun AtmScreen(
                                 Text(
                                     text = "ATM Cash Withdrawal",
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = TextPrimary
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.AccountBalance, contentDescription = null, tint = EmeraldAccent, modifier = Modifier.size(12.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Source: $bankName", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("Source: $bankName", color = TextSecondary, fontSize = 11.sp)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("• ${formatDate(atm.date)}", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("• ${formatDate(atm.date)}", color = TextSecondary, fontSize = 11.sp)
                                 }
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = String.format(Locale.getDefault(), "$%.2f", atm.amount),
+                                    text = formatPrice(atm.amount),
                                     fontWeight = FontWeight.Black,
                                     color = EmeraldAccent,
                                     fontSize = 16.sp
@@ -2098,11 +2525,16 @@ fun AtmScreen(
 @Composable
 fun LoansScreen(
     loans: List<Loan>,
+    loanInstallments: List<LoanInstallment>,
+    banks: List<BankAccount>,
     onAddLoan: () -> Unit,
     onSettledToggle: (Loan) -> Unit,
-    onDeleteLoan: (Loan) -> Unit
+    onDeleteLoan: (Loan) -> Unit,
+    onAddInstallment: (Int, Double, Int?, Long, String) -> Unit,
+    onDeleteInstallment: (LoanInstallment) -> Unit
 ) {
     var filterType by rememberSaveable { mutableStateOf("TAKEN") } // "TAKEN" vs "PROVIDED"
+    var activeLoanForInstallment by remember { mutableStateOf<Loan?>(null) }
 
     Column(
         modifier = Modifier
@@ -2118,27 +2550,37 @@ fun LoansScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "ACTIVE LOANS OUTSTANDING",
-                    color = Color.LightGray,
+                    color = TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
 
                 val activeLoans = loans.filter { !it.isSettled }
-                val totalTakenPrincipal = activeLoans.filter { it.type == "TAKEN" }.sumOf { it.amount }
-                val totalProvidedPrincipal = activeLoans.filter { it.type == "PROVIDED" }.sumOf { it.amount }
+                val totalTakenPrincipal = activeLoans.filter { it.type == "TAKEN" }.sumOf { loan ->
+                    val paid = loanInstallments.filter { it.loanId == loan.id }.sumOf { it.amount }
+                    maxOf(0.0, loan.amount - paid)
+                }
+                val totalProvidedPrincipal = activeLoans.filter { it.type == "PROVIDED" }.sumOf { loan ->
+                    val paid = loanInstallments.filter { it.loanId == loan.id }.sumOf { it.amount }
+                    maxOf(0.0, loan.amount - paid)
+                }
 
                 // Accrued interest calculates in real-time
                 val totalTakenInterest = activeLoans.filter { it.type == "TAKEN" }.sumOf { loan ->
+                    val paid = loanInstallments.filter { it.loanId == loan.id }.sumOf { it.amount }
+                    val netAmount = maxOf(0.0, loan.amount - paid)
                     val elapsedMs = System.currentTimeMillis() - loan.date
                     val elapsedDays = elapsedMs / (1000 * 60 * 60 * 24)
                     val elapsedYears = elapsedDays.toDouble() / 365.25
-                    loan.amount * (loan.interestRate / 100.0) * elapsedYears
+                    netAmount * (loan.interestRate / 100.0) * elapsedYears
                 }
                 val totalProvidedInterest = activeLoans.filter { it.type == "PROVIDED" }.sumOf { loan ->
+                    val paid = loanInstallments.filter { it.loanId == loan.id }.sumOf { it.amount }
+                    val netAmount = maxOf(0.0, loan.amount - paid)
                     val elapsedMs = System.currentTimeMillis() - loan.date
                     val elapsedDays = elapsedMs / (1000 * 60 * 60 * 24)
                     val elapsedYears = elapsedDays.toDouble() / 365.25
-                    loan.amount * (loan.interestRate / 100.0) * elapsedYears
+                    netAmount * (loan.interestRate / 100.0) * elapsedYears
                 }
 
                 Row(
@@ -2148,35 +2590,35 @@ fun LoansScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Loans Taken (Owed)", color = Color.LightGray, fontSize = 11.sp)
+                        Text("Loans Taken (Owed)", color = TextSecondary, fontSize = 11.sp)
                         Text(
-                            text = String.format(Locale.getDefault(), "$%.2f", totalTakenPrincipal + totalTakenInterest),
+                            text = formatPrice(totalTakenPrincipal + totalTakenInterest),
                             fontWeight = FontWeight.Bold,
                             color = CoralAccent,
                             fontSize = 16.sp
                         )
                         if (totalTakenInterest > 0) {
                             Text(
-                                text = String.format(Locale.getDefault(), "Incl. $%.2f accrued int.", totalTakenInterest),
+                                text = "Incl. ${formatPrice(totalTakenInterest)} accrued int.",
                                 fontSize = 10.sp,
-                                color = Color.LightGray
+                                color = TextSecondary
                             )
                         }
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("Loans Provided (Collectible)", color = Color.LightGray, fontSize = 11.sp)
+                        Text("Loans Provided (Collectible)", color = TextSecondary, fontSize = 11.sp)
                         Text(
-                            text = String.format(Locale.getDefault(), "$%.2f", totalProvidedPrincipal + totalProvidedInterest),
+                            text = formatPrice(totalProvidedPrincipal + totalProvidedInterest),
                             fontWeight = FontWeight.Bold,
                             color = EmeraldAccent,
                             fontSize = 16.sp
                         )
                         if (totalProvidedInterest > 0) {
                             Text(
-                                text = String.format(Locale.getDefault(), "Incl. $%.2f accrued int.", totalProvidedInterest),
+                                text = "Incl. ${formatPrice(totalProvidedInterest)} accrued int.",
                                 fontSize = 10.sp,
-                                color = Color.LightGray
+                                color = TextSecondary
                             )
                         }
                     }
@@ -2214,7 +2656,7 @@ fun LoansScreen(
         ) {
             Text(
                 text = if (filterType == "TAKEN") "My Borrowed Debts" else "My Custom Assets",
-                color = Color.White,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )
@@ -2243,7 +2685,7 @@ fun LoansScreen(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No items recorded in this section.", color = Color.LightGray)
+                Text("No items recorded in this section.", color = TextSecondary)
             }
         } else {
             LazyColumn(
@@ -2255,8 +2697,13 @@ fun LoansScreen(
                     val elapsedMs = System.currentTimeMillis() - loan.date
                     val elapsedDays = elapsedMs / (1000 * 60 * 60 * 24)
                     val elapsedYears = elapsedDays.toDouble() / 365.25
-                    val interestAccrued = if (loan.isSettled) 0.0 else loan.amount * (loan.interestRate / 100.0) * elapsedYears
-                    val netTotal = loan.amount + interestAccrued
+
+                    val filteredInstallments = loanInstallments.filter { it.loanId == loan.id }
+                    val totalPaidInstallments = filteredInstallments.sumOf { it.amount }
+                    val netAmount = maxOf(0.0, loan.amount - totalPaidInstallments)
+
+                    val interestAccrued = if (loan.isSettled) 0.0 else netAmount * (loan.interestRate / 100.0) * elapsedYears
+                    val netTotal = netAmount + interestAccrued
 
                     val accentColor = if (filterType == "TAKEN") CoralAccent else EmeraldAccent
 
@@ -2280,7 +2727,7 @@ fun LoansScreen(
                                             text = if (loan.isSettled) "SETTLED" else "ACTIVE",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 11.sp,
-                                            color = if (loan.isSettled) Color.LightGray else accentColor,
+                                            color = if (loan.isSettled) TextSecondary else accentColor,
                                             modifier = Modifier
                                                 .background(
                                                     if (loan.isSettled) SlateBorder else accentColor.copy(alpha = 0.15f),
@@ -2306,31 +2753,31 @@ fun LoansScreen(
                                         text = loan.name,
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 16.sp,
-                                        color = Color.White
+                                        color = TextPrimary
                                     )
                                     Text(
                                         text = loan.description,
                                         fontSize = 13.sp,
-                                        color = Color.LightGray.copy(alpha = 0.9f)
+                                        color = TextSecondary.copy(alpha = 0.9f)
                                     )
                                 }
 
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = String.format(Locale.getDefault(), "$%.2f", netTotal),
+                                        text = formatPrice(netTotal),
                                         fontWeight = FontWeight.Black,
                                         fontSize = 18.sp,
-                                        color = if (loan.isSettled) Color.LightGray else accentColor
+                                        color = if (loan.isSettled) TextSecondary else accentColor
                                     )
                                     Text(
                                         text = "Start: ${formatDate(loan.date)}",
                                         fontSize = 11.sp,
-                                        color = Color.LightGray
+                                        color = TextSecondary
                                     )
                                 }
                             }
 
-                            if (!loan.isSettled && loan.interestRate > 0.0) {
+                            if (!loan.isSettled && loan.interestRate > 0.0 && netAmount > 0.0) {
                                 Spacer(Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier
@@ -2339,9 +2786,9 @@ fun LoansScreen(
                                         .padding(6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Interest accumulated (${elapsedDays} days)", color = Color.LightGray, fontSize = 11.sp)
+                                    Text("Interest accumulated (${elapsedDays} days)", color = TextSecondary, fontSize = 11.sp)
                                     Text(
-                                        text = String.format(Locale.getDefault(), "+$%.2f", interestAccrued),
+                                        text = formatPriceSigned(interestAccrued, true),
                                         color = AmberAccent,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp
@@ -2349,8 +2796,84 @@ fun LoansScreen(
                                 }
                             }
 
+                            // Installment Payment History Section inside the Card
+                            if (filteredInstallments.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(SlateDark, RoundedCornerShape(6.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Installment History", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "Total Paid: ${formatPrice(totalPaidInstallments)}",
+                                            color = TextSecondary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    filteredInstallments.forEach { inst ->
+                                        Spacer(Modifier.height(4.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                val bank = banks.find { it.id == inst.bankId }
+                                                Text(
+                                                    text = "${formatDate(inst.date)} (${bank?.name ?: "Cash"})",
+                                                    color = TextSecondary,
+                                                    fontSize = 11.sp
+                                                )
+                                                if (inst.note.isNotEmpty()) {
+                                                    Text(
+                                                        text = " - ${inst.note}",
+                                                        color = TextSecondary.copy(alpha = 0.7f),
+                                                        fontSize = 11.sp,
+                                                        maxLines = 1,
+                                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                                        modifier = Modifier.padding(start = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = formatPrice(inst.amount),
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp
+                                                )
+                                                Spacer(Modifier.width(6.dp))
+                                                IconButton(
+                                                    onClick = { onDeleteInstallment(inst) },
+                                                    modifier = Modifier.size(18.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Delete Installment",
+                                                        tint = CoralAccent,
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             Spacer(Modifier.height(10.dp))
-                            Divider(color = SlateBorder)
+                            HorizontalDivider(color = SlateBorder)
                             Spacer(Modifier.height(8.dp))
 
                             Row(
@@ -2358,6 +2881,24 @@ fun LoansScreen(
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                if (!loan.isSettled && netAmount > 0.0) {
+                                    Button(
+                                        onClick = { activeLoanForInstallment = loan },
+                                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = if (loan.type == "TAKEN") "Pay Installment" else "Receive Installment",
+                                            fontSize = 11.sp,
+                                            color = Color.Black,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                }
+
                                 OutlinedButton(
                                     onClick = { onSettledToggle(loan) },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -2391,6 +2932,18 @@ fun LoansScreen(
             }
         }
     }
+
+    activeLoanForInstallment?.let { loan ->
+        AddInstallmentDialog(
+            loan = loan,
+            banks = banks,
+            onDismiss = { activeLoanForInstallment = null },
+            onConfirm = { amount, bankId, date, note ->
+                onAddInstallment(loan.id, amount, bankId, date, note)
+                activeLoanForInstallment = null
+            }
+        )
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2399,13 +2952,14 @@ fun LoansScreen(
 
 @Composable
 fun AddBankDialog(onDismiss: () -> Unit, onConfirm: (String, Double) -> Unit) {
+    val symbol = LocalCurrencySymbol.current
     var name by remember { mutableStateOf("") }
     var initialBalanceStr by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Bank Wallet", fontWeight = FontWeight.Bold, color = Color.White) },
+        title = { Text("Add Bank Wallet", fontWeight = FontWeight.Bold, color = TextPrimary) },
         containerColor = SlateSurface,
         text = {
             Column {
@@ -2416,10 +2970,10 @@ fun AddBankDialog(onDismiss: () -> Unit, onConfirm: (String, Double) -> Unit) {
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2428,14 +2982,14 @@ fun AddBankDialog(onDismiss: () -> Unit, onConfirm: (String, Double) -> Unit) {
                 OutlinedTextField(
                     value = initialBalanceStr,
                     onValueChange = { initialBalanceStr = it },
-                    label = { Text("Initial Balance ($)") },
+                    label = { Text("Initial Balance ($symbol)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2463,7 +3017,7 @@ fun AddBankDialog(onDismiss: () -> Unit, onConfirm: (String, Double) -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
                 Text("Cancel")
             }
         }
@@ -2476,6 +3030,7 @@ fun AddIncomeDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, Double, Int?, Long) -> Unit
 ) {
+    val symbol = LocalCurrencySymbol.current
     var description by remember { mutableStateOf("") }
     var amountStr by remember { mutableStateOf("") }
     var selectedBankId by remember { mutableStateOf<Int?>(null) }
@@ -2485,21 +3040,21 @@ fun AddIncomeDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Register Income Stream", fontWeight = FontWeight.Bold, color = Color.White) },
+        title = { Text("Register Income Stream", fontWeight = FontWeight.Bold, color = TextPrimary) },
         containerColor = SlateSurface,
         text = {
             Column {
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Short Description") },
+                    label = { Text("Short Description (Optional)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2508,14 +3063,14 @@ fun AddIncomeDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("Amount ($)") },
+                    label = { Text("Amount ($symbol)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2524,7 +3079,7 @@ fun AddIncomeDialog(
                 Spacer(Modifier.height(12.dp))
 
                 // Custom drop selector styled precisely
-                Text("Deposit Wallet Destination", color = Color.LightGray, fontSize = 12.sp)
+                Text("Deposit Wallet Destination", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
@@ -2540,8 +3095,8 @@ fun AddIncomeDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(activeBankName, color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                        Text(activeBankName, color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                     }
 
                     DropdownMenu(
@@ -2552,7 +3107,7 @@ fun AddIncomeDialog(
                             .background(SlateSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Cash on Hand", color = Color.White) },
+                            text = { Text("Cash on Hand", color = TextPrimary) },
                             onClick = {
                                 selectedBankId = null
                                 bankDropdownExpanded = false
@@ -2560,7 +3115,7 @@ fun AddIncomeDialog(
                         )
                         banks.forEach { b ->
                             DropdownMenuItem(
-                                text = { Text(b.name, color = Color.White) },
+                                text = { Text(b.name, color = TextPrimary) },
                                 onClick = {
                                     selectedBankId = b.id
                                     bankDropdownExpanded = false
@@ -2572,7 +3127,7 @@ fun AddIncomeDialog(
 
                 // Simple custom direct numerical date chooser
                 Spacer(Modifier.height(12.dp))
-                Text("Date Selection", color = Color.LightGray, fontSize = 12.sp)
+                Text("Date Selection", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Column(
                     modifier = Modifier
@@ -2583,7 +3138,7 @@ fun AddIncomeDialog(
                     Text(
                         text = "Recording date will defaults to today.",
                         fontSize = 11.sp,
-                        color = Color.LightGray
+                        color = TextSecondary
                     )
                     Text(
                         text = formatDate(dateMs),
@@ -2602,16 +3157,13 @@ fun AddIncomeDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (description.isBlank()) {
-                        error = "Description is blank"
-                        return@Button
-                    }
+                    val finalDescription = if (description.isBlank()) "Income Stream" else description
                     val amt = amountStr.toDoubleOrNull() ?: 0.0
                     if (amt <= 0.0) {
                         error = "Amount must be greater than zero."
                         return@Button
                     }
-                    onConfirm(description, amt, selectedBankId, dateMs)
+                    onConfirm(finalDescription, amt, selectedBankId, dateMs)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)
             ) {
@@ -2619,7 +3171,7 @@ fun AddIncomeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
                 Text("Cancel")
             }
         }
@@ -2632,6 +3184,7 @@ fun AddCostDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String?, String, Double, Int?, Long) -> Unit
 ) {
+    val symbol = LocalCurrencySymbol.current
     var category by remember { mutableStateOf("Rent") }
     var subCategory by remember { mutableStateOf<String?>(null) }
     var description by remember { mutableStateOf("") }
@@ -2649,12 +3202,12 @@ fun AddCostDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log Cost Expenditure", fontWeight = FontWeight.Bold, color = Color.White) },
+        title = { Text("Log Cost Expenditure", fontWeight = FontWeight.Bold, color = TextPrimary) },
         containerColor = SlateSurface,
         text = {
             Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 // Category drop selection
-                Text("Main Category", color = Color.LightGray, fontSize = 12.sp)
+                Text("Main Category", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
@@ -2669,8 +3222,8 @@ fun AddCostDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(category, color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                        Text(category, color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                     }
 
                     DropdownMenu(
@@ -2682,7 +3235,7 @@ fun AddCostDialog(
                     ) {
                         mainCategories.forEach { cat ->
                             DropdownMenuItem(
-                                text = { Text(cat, color = Color.White) },
+                                text = { Text(cat, color = TextPrimary) },
                                 onClick = {
                                     category = cat
                                     // Default subcategory if Food is selected
@@ -2701,7 +3254,7 @@ fun AddCostDialog(
                 // SubCategory Drop Select for Food
                 if (category == "Food") {
                     Spacer(Modifier.height(12.dp))
-                    Text("Food Meal Type", color = Color.LightGray, fontSize = 12.sp)
+                    Text("Food Meal Type", color = TextSecondary, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
                     Box(
                         modifier = Modifier
@@ -2716,8 +3269,8 @@ fun AddCostDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(subCategory ?: "Breakfast", color = Color.White)
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                            Text(subCategory ?: "Breakfast", color = TextPrimary)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                         }
 
                         DropdownMenu(
@@ -2729,7 +3282,7 @@ fun AddCostDialog(
                         ) {
                             foodSubCategories.forEach { sub ->
                                 DropdownMenuItem(
-                                    text = { Text(sub, color = Color.White) },
+                                    text = { Text(sub, color = TextPrimary) },
                                     onClick = {
                                         subCategory = sub
                                         subDropdownExpanded = false
@@ -2744,14 +3297,14 @@ fun AddCostDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Short Description") },
+                    label = { Text("Short Description (Optional)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = CoralAccent,
                         focusedBorderColor = CoralAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2760,14 +3313,14 @@ fun AddCostDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("Amount ($)") },
+                    label = { Text("Amount ($symbol)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = CoralAccent,
                         focusedBorderColor = CoralAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2776,7 +3329,7 @@ fun AddCostDialog(
                 Spacer(Modifier.height(12.dp))
 
                 // Payment Wallet Source (Cash pocket or specific bank account)
-                Text("Payment Wallet Source", color = Color.LightGray, fontSize = 12.sp)
+                Text("Payment Wallet Source", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
@@ -2792,8 +3345,8 @@ fun AddCostDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(walletName, color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                        Text(walletName, color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                     }
 
                     DropdownMenu(
@@ -2804,7 +3357,7 @@ fun AddCostDialog(
                             .background(SlateSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Cash on Hand", color = Color.White) },
+                            text = { Text("Cash on Hand", color = TextPrimary) },
                             onClick = {
                                 selectedBankId = null
                                 bankDropdownExpanded = false
@@ -2812,7 +3365,7 @@ fun AddCostDialog(
                         )
                         banks.forEach { b ->
                             DropdownMenuItem(
-                                text = { Text(b.name, color = Color.White) },
+                                text = { Text(b.name, color = TextPrimary) },
                                 onClick = {
                                     selectedBankId = b.id
                                     bankDropdownExpanded = false
@@ -2831,16 +3384,13 @@ fun AddCostDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (description.isBlank()) {
-                        error = "Description cannot be blank"
-                        return@Button
-                    }
+                    val finalDescription = if (description.isBlank()) (subCategory ?: category) else description
                     val amt = amountStr.toDoubleOrNull() ?: 0.0
                     if (amt <= 0.0) {
                         error = "Amount must be greater than zero."
                         return@Button
                     }
-                    onConfirm(category, subCategory, description, amt, selectedBankId, dateMs)
+                    onConfirm(category, subCategory, finalDescription, amt, selectedBankId, dateMs)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralAccent)
             ) {
@@ -2848,7 +3398,7 @@ fun AddCostDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
                 Text("Cancel")
             }
         }
@@ -2861,35 +3411,42 @@ fun AddSavingDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, String, Double, Long) -> Unit
 ) {
-    if (banks.isEmpty()) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            containerColor = SlateSurface,
-            title = { Text("Action Blocked", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = { Text("Please create a Bank Wallet first to add savings separately.", color = Color.LightGray) },
-            confirmButton = {
-                Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)) {
-                    Text("OK", color = Color.Black)
-                }
-            }
-        )
-        return
+    val symbol = LocalCurrencySymbol.current
+    val initialBankId = remember(banks) { banks.firstOrNull()?.id ?: 0 }
+    var selectedBankId by remember { mutableStateOf(initialBankId) }
+
+    LaunchedEffect(banks) {
+        if (banks.isNotEmpty() && !banks.any { it.id == selectedBankId }) {
+            selectedBankId = banks.first().id
+        }
     }
 
-    var selectedBankId by remember { mutableStateOf(banks.first().id) }
     var description by remember { mutableStateOf("Monthly Savings Deposit") }
     var amountStr by remember { mutableStateOf("") }
     var dateMs by remember { mutableStateOf(System.currentTimeMillis()) }
     var error by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    if (banks.isEmpty()) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = SlateSurface,
+            title = { Text("Action Blocked", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text("Please create a Bank Wallet first to add savings separately.", color = TextSecondary) },
+            confirmButton = {
+                Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)) {
+                    Text("OK", color = Color.Black)
+                }
+            }
+        )
+    } else {
+        AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Manual Savings Addition", fontWeight = FontWeight.Bold, color = Color.White) },
+        title = { Text("Manual Savings Addition", fontWeight = FontWeight.Bold, color = TextPrimary) },
         containerColor = SlateSurface,
         text = {
             Column {
-                Text("Savings Bank Account", color = Color.LightGray, fontSize = 12.sp)
+                Text("Savings Bank Account", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
@@ -2905,8 +3462,8 @@ fun AddSavingDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(bankName, color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                        Text(bankName, color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                     }
 
                     DropdownMenu(
@@ -2918,7 +3475,7 @@ fun AddSavingDialog(
                     ) {
                         banks.forEach { b ->
                             DropdownMenuItem(
-                                text = { Text(b.name, color = Color.White) },
+                                text = { Text(b.name, color = TextPrimary) },
                                 onClick = {
                                     selectedBankId = b.id
                                     dropdownExpanded = false
@@ -2936,10 +3493,10 @@ fun AddSavingDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -2948,14 +3505,14 @@ fun AddSavingDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("Transfer Amount ($)") },
+                    label = { Text("Transfer Amount ($symbol)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = EmeraldAccent,
                         focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2987,11 +3544,12 @@ fun AddSavingDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
                 Text("Cancel")
             }
         }
     )
+  }
 }
 
 @Composable
@@ -3000,128 +3558,382 @@ fun AddAtmDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, Double, Long, String) -> Unit
 ) {
-    if (banks.isEmpty()) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            containerColor = SlateSurface,
-            title = { Text("Action Blocked", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = { Text("You must register a Bank Wallet first to log withdrawals.", color = Color.LightGray) },
-            confirmButton = {
-                Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)) {
-                    Text("OK", color = Color.Black)
-                }
-            }
-        )
-        return
+    val symbol = LocalCurrencySymbol.current
+    val initialBankId = remember(banks) { banks.firstOrNull()?.id ?: 0 }
+    var selectedBankId by remember { mutableStateOf(initialBankId) }
+
+    LaunchedEffect(banks) {
+        if (banks.isNotEmpty() && !banks.any { it.id == selectedBankId }) {
+            selectedBankId = banks.first().id
+        }
     }
 
-    var selectedBankId by remember { mutableStateOf(banks.first().id) }
     var amountStr by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("ATM Cash Withdrawal") }
     var dateMs by remember { mutableStateOf(System.currentTimeMillis()) }
     var error by remember { mutableStateOf("") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
+    if (banks.isEmpty()) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            containerColor = SlateSurface,
+            title = { Text("Action Blocked", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text("You must register a Bank Wallet first to log withdrawals.", color = TextSecondary) },
+            confirmButton = {
+                Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)) {
+                    Text("OK", color = Color.Black)
+                }
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Configure ATM Withdrawal", fontWeight = FontWeight.Bold, color = TextPrimary) },
+            containerColor = SlateSurface,
+            text = {
+                Column {
+                    Text("Source Bank Wallet", color = TextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SlateDark)
+                            .clickable { dropdownExpanded = true }
+                            .padding(14.dp)
+                    ) {
+                        val bankName = banks.find { it.id == selectedBankId }?.name ?: "Unknown"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(bankName, color = TextPrimary)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
+                        }
+
+                        DropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = { dropdownExpanded = false },
+                            modifier = Modifier
+                                .fillMaxWidth(0.7f)
+                                .background(SlateSurface)
+                        ) {
+                            banks.forEach { b ->
+                                DropdownMenuItem(
+                                    text = { Text(b.name, color = TextPrimary) },
+                                    onClick = {
+                                        selectedBankId = b.id
+                                        dropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = amountStr,
+                        onValueChange = { amountStr = it },
+                        label = { Text("Withdrawal Amount ($symbol)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedLabelColor = EmeraldAccent,
+                            focusedBorderColor = EmeraldAccent,
+                            unfocusedLabelColor = TextSecondary,
+                            unfocusedBorderColor = SlateBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Withdrawal Tag Description") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedLabelColor = EmeraldAccent,
+                            focusedBorderColor = EmeraldAccent,
+                            unfocusedLabelColor = TextSecondary,
+                            unfocusedBorderColor = SlateBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (error.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(error, color = CoralAccent, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = amountStr.toDoubleOrNull() ?: 0.0
+                        if (amt <= 0.0) {
+                            error = "Amount must be a valid number"
+                            return@Button
+                        }
+                        onConfirm(selectedBankId, amt, dateMs, description)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)
+                ) {
+                    Text("Process ATM Cash", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun GoogleSignInDialog(
+    savedEmails: Set<String>,
+    onDismiss: () -> Unit,
+    onLogin: (String) -> Unit,
+    onRemoveSavedEmail: (String) -> Unit
+) {
+    var showEmailForm by remember { mutableStateOf(savedEmails.isEmpty()) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Configure ATM Withdrawal", fontWeight = FontWeight.Bold, color = Color.White) },
         containerColor = SlateSurface,
+        title = null,
         text = {
-            Column {
-                Text("Source Bank Wallet", color = Color.LightGray, fontSize = 12.sp)
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SlateDark)
-                        .clickable { dropdownExpanded = true }
-                        .padding(14.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                // Google styled Header
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val bankName = banks.find { it.id == selectedBankId }?.name ?: "Unknown"
+                    Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Black, fontSize = 28.sp)
+                    Text("o", color = Color(0xFFEA4335), fontWeight = FontWeight.Black, fontSize = 24.sp)
+                    Text("o", color = Color(0xFFFBBC05), fontWeight = FontWeight.Black, fontSize = 24.sp)
+                    Text("g", color = Color(0xFF4285F4), fontWeight = FontWeight.Black, fontSize = 24.sp)
+                    Text("l", color = Color(0xFF34A853), fontWeight = FontWeight.Black, fontSize = 24.sp)
+                    Text("e", color = Color(0xFFEA4335), fontWeight = FontWeight.Black, fontSize = 24.sp)
+                }
+
+                if (!showEmailForm) {
+                    Text(
+                        text = "Choose an account",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Text(
+                        text = "to continue to Finance Tracker",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(bottom = 16.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        savedEmails.forEach { email ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, SlateBorder, RoundedCornerShape(8.dp))
+                                    .clickable { onLogin(email) },
+                                colors = CardDefaults.cardColors(containerColor = SlateDark)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                  ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF4285F4)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = email.take(1).uppercase(),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                        }
+                                        Spacer(Modifier.width(12.dp))
+                                        Text(
+                                            text = email,
+                                            color = Color.White, // Always white on dark SlateDark card back
+                                            fontSize = 14.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onRemoveSavedEmail(email) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Remove account from device",
+                                            tint = CoralAccent,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    TextButton(
+                        onClick = { showEmailForm = true },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF4285F4))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add Google account", fontWeight = FontWeight.Bold, color = Color(0xFF4285F4))
+                    }
+                } else {
+                    Text(
+                        text = "Sign in",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Text(
+                        text = "with your Google Account",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(bottom = 16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = {
+                            emailInput = it
+                            error = ""
+                        },
+                        label = { Text("Email or phone") },
+                        placeholder = { Text("example@gmail.com") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = Color(0xFF4285F4),
+                            unfocusedBorderColor = SlateBorder,
+                            focusedLabelColor = Color(0xFF4285F4),
+                            unfocusedLabelColor = TextSecondary
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            error = ""
+                        },
+                        label = { Text("Enter your password") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = Color(0xFF4285F4),
+                            unfocusedBorderColor = SlateBorder,
+                            focusedLabelColor = Color(0xFF4285F4),
+                            unfocusedLabelColor = TextSecondary
+                        ),
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(icon, contentDescription = null, tint = TextSecondary)
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (error.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(error, color = CoralAccent, fontSize = 12.sp)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(bankName, color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
-                    }
+                        if (savedEmails.isNotEmpty()) {
+                            TextButton(onClick = { showEmailForm = false }) {
+                                Text("Back to accounts", color = TextSecondary)
+                            }
+                        } else {
+                            Spacer(Modifier.width(1.dp))
+                        }
 
-                    DropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .background(SlateSurface)
-                    ) {
-                        banks.forEach { b ->
-                            DropdownMenuItem(
-                                text = { Text(b.name, color = Color.White) },
-                                onClick = {
-                                    selectedBankId = b.id
-                                    dropdownExpanded = false
+                        Button(
+                            onClick = {
+                                if (emailInput.isBlank()) {
+                                    error = "Please enter your Gmail address."
+                                    return@Button
                                 }
-                            )
+                                if (!emailInput.contains("@") || !emailInput.endsWith(".com")) {
+                                    error = "Please enter a valid Gmail address (e.g. user@gmail.com)."
+                                    return@Button
+                                }
+                                if (passwordInput.isBlank()) {
+                                    error = "Please enter your password."
+                                    return@Button
+                                }
+                                if (passwordInput.length < 4) {
+                                    error = "Password must be at least 4 characters long."
+                                    return@Button
+                                }
+                                onLogin(emailInput.trim())
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4))
+                        ) {
+                            Text("Next", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = amountStr,
-                    onValueChange = { amountStr = it },
-                    label = { Text("Withdrawal Amount ($)") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedLabelColor = EmeraldAccent,
-                        focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
-                        unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Withdrawal Tag Description") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedLabelColor = EmeraldAccent,
-                        focusedBorderColor = EmeraldAccent,
-                        unfocusedLabelColor = Color.LightGray,
-                        unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                if (error.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(error, color = CoralAccent, fontSize = 12.sp)
-                }
             }
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val amt = amountStr.toDoubleOrNull() ?: 0.0
-                    if (amt <= 0.0) {
-                        error = "Amount must be a valid number"
-                        return@Button
-                    }
-                    onConfirm(selectedBankId, amt, dateMs, description)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent)
-            ) {
-                Text("Process ATM Cash", color = Color.Black, fontWeight = FontWeight.Bold)
-            }
-        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
                 Text("Cancel")
@@ -3135,6 +3947,7 @@ fun AddLoanDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String, String, Double, Double, Long) -> Unit
 ) {
+    val symbol = LocalCurrencySymbol.current
     var type by remember { mutableStateOf("TAKEN") } // "TAKEN" (Owed) vs "PROVIDED" (Asset)
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -3147,11 +3960,11 @@ fun AddLoanDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log New Debt/Loan Arrangement", fontWeight = FontWeight.Bold, color = Color.White) },
+        title = { Text("Log New Debt/Loan Arrangement", fontWeight = FontWeight.Bold, color = TextPrimary) },
         containerColor = SlateSurface,
         text = {
             Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                Text("Arrangement Type", color = Color.LightGray, fontSize = 12.sp)
+                Text("Arrangement Type", color = TextSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
@@ -3166,8 +3979,8 @@ fun AddLoanDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(if (type == "TAKEN") "Loan I Borrowed (Taken)" else "Loan I Provided (Asset)", color = Color.White)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.LightGray)
+                        Text(if (type == "TAKEN") "Loan I Borrowed (Taken)" else "Loan I Provided (Asset)", color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
                     }
 
                     DropdownMenu(
@@ -3178,14 +3991,14 @@ fun AddLoanDialog(
                             .background(SlateSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Loan I Borrowed (Taken)", color = Color.White) },
+                            text = { Text("Loan I Borrowed (Taken)", color = TextPrimary) },
                             onClick = {
                                 type = "TAKEN"
                                 typeDropdownExpanded = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Loan I Lended (Provided)", color = Color.White) },
+                            text = { Text("Loan I Lended (Provided)", color = TextPrimary) },
                             onClick = {
                                 type = "PROVIDED"
                                 typeDropdownExpanded = false
@@ -3202,10 +4015,10 @@ fun AddLoanDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = AmberAccent,
                         focusedBorderColor = AmberAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -3218,10 +4031,10 @@ fun AddLoanDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = AmberAccent,
                         focusedBorderColor = AmberAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -3230,14 +4043,14 @@ fun AddLoanDialog(
                 OutlinedTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
-                    label = { Text("Loan Principal Amount ($)") },
+                    label = { Text("Loan Principal Amount ($symbol)") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = AmberAccent,
                         focusedBorderColor = AmberAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -3251,10 +4064,10 @@ fun AddLoanDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedLabelColor = AmberAccent,
                         focusedBorderColor = AmberAccent,
-                        unfocusedLabelColor = Color.LightGray,
+                        unfocusedLabelColor = TextSecondary,
                         unfocusedBorderColor = SlateBorder,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -3288,7 +4101,165 @@ fun AddLoanDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun AddInstallmentDialog(
+    loan: Loan,
+    banks: List<BankAccount>,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Int?, Long, String) -> Unit
+) {
+    val symbol = LocalCurrencySymbol.current
+    var amountStr by remember { mutableStateOf("") }
+    var selectedBankId by remember { mutableStateOf<Int?>(null) } // null means Cash pocket
+    var note by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    val dateMs by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    var bankDropdownExpanded by remember { mutableStateOf(false) }
+
+    val accentColor = if (loan.type == "TAKEN") AmberAccent else EmeraldAccent
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (loan.type == "TAKEN") "Pay Loan Installment" else "Receive Loan Installment",
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+        },
+        containerColor = SlateSurface,
+        text = {
+            Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Text(
+                    text = "Loan: ${loan.name} (${if (loan.type == "TAKEN") "Borrowed" else "Lended"})",
+                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                OutlinedTextField(
+                    value = amountStr,
+                    onValueChange = { amountStr = it },
+                    label = { Text("Installment Amount (${symbol})") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedLabelColor = accentColor,
+                        focusedBorderColor = accentColor,
+                        unfocusedLabelColor = TextSecondary,
+                        unfocusedBorderColor = SlateBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = if (loan.type == "TAKEN") "Pay From (Account/Cash)" else "Receive Into (Account/Cash)",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SlateDark)
+                        .clickable { bankDropdownExpanded = true }
+                        .padding(14.dp)
+                ) {
+                    val activeBank = banks.find { it.id == selectedBankId }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(activeBank?.name ?: "Cash pocket", color = TextPrimary)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = TextSecondary)
+                    }
+
+                    DropdownMenu(
+                        expanded = bankDropdownExpanded,
+                        onDismissRequest = { bankDropdownExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .background(SlateSurface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Cash pocket", color = TextPrimary) },
+                            onClick = {
+                                selectedBankId = null
+                                bankDropdownExpanded = false
+                            }
+                        )
+                        banks.forEach { bank ->
+                            DropdownMenuItem(
+                                text = { Text(bank.name, color = TextPrimary) },
+                                onClick = {
+                                    selectedBankId = bank.id
+                                    bankDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Installment Label / Note (Optional)") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedLabelColor = accentColor,
+                        focusedBorderColor = accentColor,
+                        unfocusedLabelColor = TextSecondary,
+                        unfocusedBorderColor = SlateBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (error.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(error, color = CoralAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amt = amountStr.toDoubleOrNull()
+                    if (amt == null || amt <= 0.0) {
+                        error = "Please enter a valid positive amount."
+                    } else {
+                        onConfirm(amt, selectedBankId, dateMs, note)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+            ) {
+                Text("Log Payment", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = TextSecondary)
+            ) {
                 Text("Cancel")
             }
         }

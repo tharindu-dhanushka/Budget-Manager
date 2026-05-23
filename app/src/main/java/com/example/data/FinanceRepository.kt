@@ -9,6 +9,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     val allAtmWithdrawals: Flow<List<AtmWithdrawal>> = financeDao.getAllAtmWithdrawals()
     val allSavings: Flow<List<Saving>> = financeDao.getAllSavings()
     val allLoans: Flow<List<Loan>> = financeDao.getAllLoans()
+    val allLoanInstallments: Flow<List<LoanInstallment>> = financeDao.getAllLoanInstallments()
 
     suspend fun insertBankAccount(account: BankAccount) = financeDao.insertBankAccount(account)
     suspend fun deleteBankAccount(account: BankAccount) = financeDao.deleteBankAccount(account)
@@ -27,4 +28,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
 
     suspend fun insertLoan(loan: Loan) = financeDao.insertLoan(loan)
     suspend fun deleteLoan(loan: Loan) = financeDao.deleteLoan(loan)
+
+    suspend fun insertLoanInstallment(installment: LoanInstallment) = financeDao.insertLoanInstallment(installment)
+    suspend fun deleteLoanInstallment(installment: LoanInstallment) = financeDao.deleteLoanInstallment(installment)
 }

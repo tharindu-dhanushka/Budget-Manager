@@ -12,7 +12,8 @@ import androidx.room.RoomDatabase
         Cost::class,
         AtmWithdrawal::class,
         Saving::class,
-        Loan::class
+        Loan::class,
+        LoanInstallment::class
     ],
     version = 1,
     exportSchema = false

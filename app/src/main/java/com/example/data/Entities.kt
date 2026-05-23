@@ -59,3 +59,13 @@ data class Loan(
     val date: Long, // Start Date of loan
     val isSettled: Boolean = false
 )
+
+@Entity(tableName = "loan_installments")
+data class LoanInstallment(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val loanId: Int,
+    val amount: Double,
+    val date: Long,
+    val bankId: Int?, // null means Cash pocket
+    val note: String = ""
+)

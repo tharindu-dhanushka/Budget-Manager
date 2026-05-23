@@ -64,4 +64,14 @@ interface FinanceDao {
 
     @Delete
     suspend fun deleteLoan(loan: Loan)
+
+    // Loan Installments
+    @Query("SELECT * FROM loan_installments ORDER BY date DESC")
+    fun getAllLoanInstallments(): Flow<List<LoanInstallment>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLoanInstallment(installment: LoanInstallment)
+
+    @Delete
+    suspend fun deleteLoanInstallment(installment: LoanInstallment)
 }
